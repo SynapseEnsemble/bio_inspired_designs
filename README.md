@@ -23,6 +23,22 @@
   ─────────────────────────────────────────────────────────────────────────────
 ```
 
+[![License: MIT + Citation](https://img.shields.io/badge/License-MIT%20%2B%20Citation-blue.svg)](LICENSE)
+[![Cite this](https://img.shields.io/badge/Cite%20this-CITATION.cff-orange.svg)](CITATION.cff)
+[![Author](https://img.shields.io/badge/Author-S3cS%26M%40n-green.svg)](https://github.com/octomergy)
+
+> **License & Citation** — This project is released under MIT with a citation requirement.
+> Any published work (paper, thesis, blog post, talk) that uses or builds on this must cite **S3cS&M@n**.
+> See [`LICENSE`](LICENSE) and [`CITATION.cff`](CITATION.cff) for the required citation text.
+
+---
+
+<video src="murmuration-k8s-v2/imgs/murmurization.mp4" controls width="100%">
+  <p>Your browser does not support HTML5 video. <a href="murmuration-k8s-v2/imgs/murmurization.mp4">Download the demo video</a>.</p>
+</video>
+
+*Complete incident cycle: healthy mesh → malware injection → credential revocation → neighbour hardening → zero-downtime swap → forensic preservation → clean respawn.*
+
 ---
 
 ## 1. What This Is
@@ -302,9 +318,126 @@ The replacement is created with `traffic: inactive`. It cannot receive requests 
 
 ---
 
-## 4. The Three Upgrades (What Makes This Production-Relevant)
+## 4. Attack & Containment: Sequence and State Diagrams
 
-### 4.1 Zero-Downtime Isolation (Blue/Green Pod Swap)
+### 4.1 Incident Response Sequence
+
+The full interaction between actors during a murmuration response. All three boid rules fire in parallel at T+0s via a `par` block — this is not sequential orchestration, it is concurrent local reaction.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Attacker
+    participant P7 as pod-7
+    participant C  as Controller
+    participant V  as Vault
+    participant NB as Neighbours ×7
+    participant R  as pod-7-rep
+    participant S  as K8s Service
+
+    Attacker->>P7: malware injection
+    P7-->>C: k8s watch event: state=infected (T+0s)
+
+    C->>V: token.revoke(pod-7-token)
+    Note right of V: attacker credential dead in <1s
+
+    par Separation
+        C->>P7: patch traffic=inactive
+        P7-->>S: removed from endpoints
+    and Alignment
+        C->>NB: patch state=hardened ×7
+    and Cohesion
+        C->>R: create_namespaced_pod() + init container
+    end
+
+    R->>R: OS patches + compliance scan (~30s)
+    R-->>S: patch traffic=active (T+35s)
+    C->>V: token.create(pod-7-rep, ttl=10m)
+    Note right of V: fresh JIT credential issued
+
+    C->>P7: apply NetworkPolicy deny-all (T+36s)
+    Note over P7: forensic window 60s
+
+    C->>P7: delete (T+96s)
+    Note over P7: StatefulSet recreates pod-7 with init container
+
+    Note over NB: patch state=healthy at T+261s
+```
+
+---
+
+### 4.2 Pod State Machine
+
+Every pod in the mesh is a state machine. The transition labels show which controller action or timer triggers each edge. Note that `respawning` is a distinct lifecycle for replacement pods — they are never `infected`, they live only to bridge the gap.
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    [*]          --> healthy     : StatefulSet spawn\n+ init container
+
+    healthy      --> infected    : malware detected\n(label patch)
+    healthy      --> hardened    : neighbour infected\n(_nearest_n rule)
+
+    infected     --> draining    : traffic=inactive\n(T+0s)
+    draining     --> isolated    : NetworkPolicy\napplied (T+36s)
+    isolated     --> forensic    : forensic window\nopen
+    forensic     --> [*]         : pod deleted\n(T+96s)
+
+    hardened     --> healthy     : HARDEN_DECAY\n120s elapsed
+
+    [*]          --> respawning  : create_replacement\n_pod()
+    respawning   --> healthy     : readiness probe\npassed (~T+35s)
+    healthy      --> [*]         : replacement retired\n(T+141s)
+```
+
+---
+
+### 4.3 Containment Flowchart
+
+The decision path from infection detection through to clean recovery. The three boid rules fan out in parallel immediately; isolation and forensics follow only after the replacement is confirmed serving.
+
+```mermaid
+flowchart TD
+    W([k8s watch\nstate=infected]) --> P0
+
+    subgraph P0 [Phase 0 — T+0s]
+        direction TB
+        V0[Vault: token.revoke] --> VD[attacker credential dead]
+    end
+
+    P0 --> P1 & P2 & P3
+
+    subgraph P1 [Phase 1 — Alignment]
+        N[_nearest_n × 7] --> H[patch state=hardened]
+    end
+
+    subgraph P2 [Phase 2 — Separation]
+        LB[patch traffic=inactive] --> EP[removed from\nService endpoints]
+    end
+
+    subgraph P3 [Phase 3 — Cohesion]
+        CR[create_namespaced_pod\n+ init container] --> IC[OS patches\ncompliance scan]
+        IC --> RD{readiness\nprobe?}
+        RD -->|pass ~T+35s| TA[traffic=active\nfresh JIT token]
+        RD -->|timeout 240s| TF[log failure\ncontinue isolation]
+    end
+
+    TA --> ISO[Phase 5 — T+36s\nNetworkPolicy seal]
+    ISO --> FW[Forensic window\n60s]
+    FW --> DEL[delete infected pod]
+    DEL --> SS[StatefulSet recreates\npod with init container]
+    SS --> NJ([pod joins mesh\ncredentialled + patched])
+
+    H --> HD[HARDEN_DECAY\n120s timer]
+    HD --> DH([neighbours → healthy])
+```
+
+---
+
+## 5. The Three Upgrades (What Makes This Production-Relevant)
+
+### 5.1 Zero-Downtime Isolation (Blue/Green Pod Swap)
 
 **The problem with naive isolation:** The simplest response to a compromised pod is `kubectl delete pod`. This works, but in a StatefulSet with no replacement strategy, the interval between deletion and the recreated pod passing its readiness probe is a period of reduced capacity. For a small cluster under load, that interval matters. For a service tier running at 90% utilisation, it causes dropped requests.
 
@@ -345,7 +478,7 @@ The replacement is created with `traffic: inactive`. It cannot receive requests 
 
 The key invariant: `patch_pod_traffic(rep_name, "active")` is called before `patch_pod_label(pod_name, "isolated")`. The order is enforced by the linear execution of `run_murmuration_response()`.
 
-### 4.2 JIT Credential Revocation via Vault
+### 5.2 JIT Credential Revocation via Vault
 
 **The gap in conventional security:** Most credential rotation strategies operate on a schedule — rotate every 30 days, or every 24 hours if the security posture is aggressive. An attacker who compromises a pod at T+1 after a rotation has up to 86,399 seconds of valid credential access. The credential is not the indicator of compromise; it is the resource being protected. Waiting for the next scheduled rotation to expire a stolen credential is not a security control; it is an SLA for how long an attacker may operate undetected.
 
@@ -371,7 +504,7 @@ The Vault `token/revoke` endpoint is synchronous. From the moment `vault_client.
 
 **Demo vs production:** This demo runs Vault in dev mode with a root token. In production, token creation would use a narrowly-scoped policy with `path "secret/data/pod-*" { capabilities = ["read"] }`, and the controller's own credential to Vault would be a Kubernetes service account token bound via the Vault Kubernetes auth method. See §6.
 
-### 4.3 Patch-on-Respawn via Init Containers
+### 5.3 Patch-on-Respawn via Init Containers
 
 Every pod that joins the mesh — both the initial 16 StatefulSet pods and every replacement pod — runs a security init container before its main application container starts. The init container cannot be skipped: Kubernetes guarantees that init containers run to completion before the `containers` array starts. A pod whose init container fails will not start its main container and will not pass its readiness probe, meaning it will not be added to the Service endpoints.
 
@@ -403,7 +536,7 @@ The operational consequence is worth stating explicitly: when an attacker causes
 
 ---
 
-## 5. Visualisation
+## 6. Visualisation
 
 The mesh state is visualised in real time via a WebSocket-connected HTML canvas. The controller broadcasts `{"type": "state", "data": ...}` on every pod state transition and `{"type": "event", ...}` on every security event. The UI renders the mesh as a circular arrangement of 16 nodes connected to their four nearest neighbours, with state encoded in colour and animation.
 
@@ -420,16 +553,6 @@ The mesh state is visualised in real time via a WebSocket-connected HTML canvas.
 | `forensic` | Light purple | Forensic window; preserved for analysis |
 
 A green dot at the top-right of each pod circle indicates an active JIT Vault credential. The dot disappears immediately when the credential is revoked — a real-time visual indicator that an attacker's token is dead.
-
----
-
-**Demo — Full incident cycle**
-
-<video src="murmuration-k8s-v2/imgs/murmurization.mp4" controls width="100%">
-  <p>Your browser does not support HTML5 video. <a href="murmuration-k8s-v2/imgs/murmurization.mp4">Download the demo video</a>.</p>
-</video>
-
-*Complete incident cycle: healthy mesh → malware injection → credential revocation → neighbour hardening → zero-downtime swap → forensic preservation → clean respawn.*
 
 ---
 
@@ -457,7 +580,7 @@ A green dot at the top-right of each pod circle indicates an active JIT Vault cr
 
 ---
 
-## 6. Demo vs Production: Honest Assessment
+## 7. Demo vs Production: Honest Assessment
 
 This is a working prototype that demonstrates the architectural concept and all three v2 mechanisms. It is not hardened for production workloads. The following table is an honest accounting of what would need to change.
 
@@ -483,7 +606,7 @@ The verdict: the architecture is sound and all three v2 mechanisms work as descr
 
 ---
 
-## 7. Dependencies
+## 8. Dependencies
 
 | Dependency | Version | Purpose | Install |
 |---|---|---|---|
@@ -503,7 +626,7 @@ Python packages are installed inside the controller container at build time. The
 
 ---
 
-## 8. Quick Start
+## 9. Quick Start
 
 ### Prerequisites
 
@@ -679,7 +802,7 @@ docker build -t murmuration-ui:dev         ./ui/
 
 ---
 
-## 9. Architecture Walkthrough
+## 10. Architecture Walkthrough
 
 ### From `helm install` to a Healthy, Credentialled Pod
 
@@ -783,7 +906,7 @@ At this point, the mesh is running: 16 pods healthy, each with a JIT credential,
 
 ---
 
-## 10. Extending This Prototype
+## 11. Extending This Prototype
 
 ### 1. Real Anomaly Detection via Falco
 
@@ -819,7 +942,7 @@ At this point, the mesh is running: 16 pods healthy, each with a JIT credential,
 
 ---
 
-## 11. The Observed Science
+## 12. The Observed Science
 
 There is a standard way to interpret what this prototype demonstrates, and it is the engineering interpretation: three mechanisms, a state machine, some label patches, a Vault API call. That interpretation is correct. There is also a less standard interpretation, and it is worth stating.
 
@@ -835,7 +958,7 @@ Four hundred million years of predator–prey coevolution produced the murmurati
 
 ---
 
-## 12. References
+## 13. References
 
 Reynolds, C.W. (1986). Flocks, herds and schools: A distributed behavioral model. *SIGGRAPH Computer Graphics*, 21(4), 25–34. The original three-rule boid algorithm. All subsequent implementations, including this one, trace to this paper.
 
