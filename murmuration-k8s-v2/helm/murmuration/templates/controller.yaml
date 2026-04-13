@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: murmuration-controller
+  namespace: murmuration-system
+  labels:
+    app: murmuration-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: murmuration-controller
+  template:
+    metadata:
+      labels:
+        app: murmuration-controller
+    spec:
+      serviceAccountName: murmuration-controller
+      containers:
+        - name: controller
+          image: {{ .Values.controller.image }}
+          imagePullPolicy: {{ .Values.controller.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DEMO_NAMESPACE
+              value: {{ .Values.demo.namespace | quote }}
+            - name: NEIGHBOUR_COUNT
+              value: {{ .Values.controller.env.NEIGHBOUR_COUNT | quote }}
+            - name: FORENSIC_WINDOW_S
+              value: {{ .Values.controller.env.FORENSIC_WINDOW_S | quote }}
+            - name: HARDEN_DECAY_S
+              value: {{ .Values.controller.env.HARDEN_DECAY_S | quote }}
+            - name: VAULT_ADDR
+              value: "http://vault.murmuration-system.svc.cluster.local:8200"
+            - name: VAULT_TOKEN
+              value: {{ .Values.vault.rootToken | quote }}
+            - name: DEMO_IMAGE
+              value: {{ .Values.demo.image | quote }}
+            - name: CONTROLLER_URL
+              value: "http://murmuration-controller.murmuration-system.svc.cluster.local:8080"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: murmuration-controller
+  namespace: murmuration-system
+spec:
+  selector:
+    app: murmuration-controller
+  ports:
+    - port: 8080
+      targetPort: 8080

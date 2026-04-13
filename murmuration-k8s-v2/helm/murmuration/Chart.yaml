@@ -1,0 +1,6 @@
+apiVersion: v2
+name: murmuration
+description: Murmuration K8s Security Mesh v2 — zero-downtime isolation, JIT credentials, patch-on-respawn
+type: application
+version: 0.2.0
+appVersion: "0.2.0"

@@ -1,0 +1,20 @@
+controller:
+  image: murmuration-controller:dev
+  imagePullPolicy: IfNotPresent
+  env:
+    NEIGHBOUR_COUNT:    "7"
+    FORENSIC_WINDOW_S:  "60"
+    HARDEN_DECAY_S:     "120"
+
+ui:
+  image: murmuration-ui:dev
+  imagePullPolicy: IfNotPresent
+
+demo:
+  image:       murmuration-demo:dev
+  imagePullPolicy: IfNotPresent
+  replicas:    16
+  namespace:   murmuration-demo
+
+vault:
+  rootToken: murmuration-root   # dev mode only — never use in production

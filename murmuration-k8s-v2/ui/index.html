@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Murmuration K8s — v2 Zero Downtime Security Mesh</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#080c18;color:#ccd;font-family:system-ui,sans-serif;padding:14px;min-height:100vh}
+h1{font-size:13px;font-weight:500;color:#778;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px}
+canvas{display:block;width:100%;border-radius:8px;border:0.5px solid #1a2030;cursor:crosshair}
+.stats{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:8px 0}
+.stat{background:#0d1220;border-radius:6px;padding:6px 8px;text-align:center;border:0.5px solid #1a2030}
+.stat-val{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.stat-lbl{font-size:9px;color:#445;margin-top:1px;text-transform:uppercase;letter-spacing:.04em}
+.s-healthy{color:#1D9E75}.s-hardened{color:#EF9F27}.s-infected{color:#E24B4A}
+.s-draining{color:#FF6B35}.s-isolated{color:#7B5EA7}.s-forensic{color:#9B7FA8}.s-respawning{color:#378ADD}
+.panel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.card{background:#0d1220;border-radius:8px;border:0.5px solid #1a2030;padding:10px 12px}
+.card-title{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.07em;color:#334;margin-bottom:8px}
+.log{height:160px;overflow-y:auto;font-family:monospace;font-size:10px}
+.log-line{padding:1px 0;line-height:1.65;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log-danger{color:#E24B4A}.log-warn{color:#EF9F27}.log-ok{color:#1D9E75}
+.log-info{color:#378ADD}.log-gray{color:#334}
+.btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+button{padding:7px 10px;border-radius:6px;border:0.5px solid #2a3040;background:#111620;
+  font-size:11px;font-weight:500;cursor:pointer;color:#99a;font-family:inherit;transition:background .12s;text-align:left}
+button:hover{background:#1a2030}
+button.inject{border-color:#E24B4A;color:#E24B4A}
+button.inject:hover{background:#1a0808}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.leg{display:flex;align-items:center;gap:4px;font-size:10px;color:#445}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.conn-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;
+  padding:3px 8px;border-radius:4px;margin-bottom:8px;border:0.5px solid}
+.conn-ok{background:#041a10;border-color:#1D9E75;color:#1D9E75}
+.conn-err{background:#1a0408;border-color:#E24B4A;color:#E24B4A}
+.pod-list{max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:3px}
+.pod-row{display:flex;align-items:center;justify-content:space-between;padding:3px 7px;
+  border-radius:4px;background:#0a0f1c;cursor:pointer;border:0.5px solid #1a2030;transition:border-color .12s}
+.pod-row:hover{border-color:#2a3040}
+.pod-name{font-family:monospace;font-size:10px;color:#667}
+.pod-right{display:flex;align-items:center;gap:5px}
+.pod-cred{width:6px;height:6px;border-radius:50%;background:#1D9E75;title:"JIT credential active"}
+.pod-cred.none{background:#334}
+.pod-state-badge{font-size:9px;font-weight:500;padding:1px 6px;border-radius:3px}
+.timeline{font-family:monospace;font-size:9px;color:#334;line-height:1.9;padding:4px 0}
+.tl-row{display:flex;gap:8px}
+.tl-t{color:#445;min-width:36px}
+.tl-active{color:#1D9E75}
+.tl-pending{color:#223}
+.vault-status{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:10px;color:#445;
+  border-top:0.5px solid #1a2030;padding-top:6px}
+.vault-dot{width:7px;height:7px;border-radius:50%}
+.vault-ok{background:#1D9E75}.vault-err{background:#E24B4A}
+</style>
+</head>
+<body>
+<h1>Murmuration K8s — v2 &nbsp;|&nbsp; Zero-Downtime Security Mesh + JIT Credentials + Patch-on-Respawn</h1>
+<div id="conn" class="conn-badge conn-err">&#9679; Connecting...</div>
+
+<canvas id="c" height="400"></canvas>
+
+<div class="stats">
+  <div class="stat"><div class="stat-val s-healthy"    id="s0">0</div><div class="stat-lbl">Healthy</div></div>
+  <div class="stat"><div class="stat-val s-hardened"   id="s1">0</div><div class="stat-lbl">Hardened</div></div>
+  <div class="stat"><div class="stat-val s-infected"   id="s2">0</div><div class="stat-lbl">Infected</div></div>
+  <div class="stat"><div class="stat-val s-draining"   id="s3">0</div><div class="stat-lbl">Draining</div></div>
+  <div class="stat"><div class="stat-val s-isolated"   id="s4">0</div><div class="stat-lbl">Isolated</div></div>
+  <div class="stat"><div class="stat-val s-forensic"   id="s5">0</div><div class="stat-lbl">Forensic</div></div>
+  <div class="stat"><div class="stat-val s-respawning" id="s6">0</div><div class="stat-lbl">Patching</div></div>
+</div>
+
+<div class="panel">
+  <div class="card">
+    <div class="card-title">Pods &nbsp;<span style="color:#334;font-weight:400">(click to inject malware)</span></div>
+    <div class="pod-list" id="pod-list"></div>
+    <div class="vault-status">
+      <div class="vault-dot" id="vault-dot"></div>
+      <span id="vault-label">Vault: checking...</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Event log</div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin-top:8px">
+  <div class="card">
+    <div class="card-title">Actions</div>
+    <div class="btn-grid">
+      <button class="inject" onclick="injectRandom()">&#9888; Inject malware (random pod)</button>
+      <button onclick="healAll()">&#10003; Heal hardened pods</button>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#1D9E75"></div>Healthy</div>
+      <div class="leg"><div class="leg-dot" style="background:#EF9F27"></div>Hardened (pre-emptive)</div>
+      <div class="leg"><div class="leg-dot" style="background:#E24B4A"></div>Infected</div>
+      <div class="leg"><div class="leg-dot" style="background:#FF6B35"></div>Draining (off LB)</div>
+      <div class="leg"><div class="leg-dot" style="background:#7B5EA7"></div>Isolated (ACL sealed)</div>
+      <div class="leg"><div class="leg-dot" style="background:#9B7FA8"></div>Forensic window</div>
+      <div class="leg"><div class="leg-dot" style="background:#378ADD"></div>Patching + respawning</div>
+      <div class="leg"><div class="leg-dot" style="background:#1D9E75;width:6px;height:6px"></div>JIT credential active</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Zero-downtime response timeline</div>
+    <div class="timeline" id="timeline">
+      <div class="tl-row"><span class="tl-t">T+0s</span><span class="tl-pending">Waiting for infection event...</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var canvas = document.getElementById('c');
+var ctx    = canvas.getContext('2d');
+var W = 0, H = 400;
+
+function resize(){
+  var r = canvas.parentElement.getBoundingClientRect();
+  W = Math.floor(r.width);
+  canvas.width = W; canvas.height = H;
+}
+resize();
+window.addEventListener('resize', resize);
+
+var COLORS = {
+  healthy:    '#1D9E75',
+  hardened:   '#EF9F27',
+  infected:   '#E24B4A',
+  draining:   '#FF6B35',
+  isolated:   '#7B5EA7',
+  forensic:   '#9B7FA8',
+  respawning: '#378ADD',
+};
+var BADGE_BG = {
+  healthy:    '#041a10',
+  hardened:   '#1a1000',
+  infected:   '#1a0408',
+  draining:   '#1a0800',
+  isolated:   '#100818',
+  forensic:   '#130d18',
+  respawning: '#040c1a',
+};
+
+var pods = [], edges = [], pulses = {}, prevStates = {};
+var ws = null, logLines = [], tick = 0;
+var incidentStart = null, incidentPod = null;
+
+var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/ws';
+
+function connect(){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = function(){
+    var el = document.getElementById('conn');
+    el.textContent = '\u25cf Connected to controller v2';
+    el.className = 'conn-badge conn-ok';
+    checkVault();
+  };
+  ws.onclose = function(){
+    var el = document.getElementById('conn');
+    el.textContent = '\u25cf Disconnected \u2014 reconnecting...';
+    el.className = 'conn-badge conn-err';
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = function(e){
+    var msg = JSON.parse(e.data);
+    if (msg.type === 'state')  handleState(msg.data);
+    if (msg.type === 'event')  handleEvent(msg);
+  };
+}
+
+function checkVault(){
+  fetch('/health').then(r=>r.json()).then(function(d){
+    var dot   = document.getElementById('vault-dot');
+    var label = document.getElementById('vault-label');
+    if (d.vault_connected){
+      dot.className   = 'vault-dot vault-ok';
+      label.textContent = 'Vault: connected — JIT credentials active';
+    } else {
+      dot.className   = 'vault-dot vault-err';
+      label.textContent = 'Vault: unavailable — credentials disabled';
+    }
+  }).catch(function(){ });
+}
+
+function handleState(data){
+  var newStates = {};
+  (data.pods || []).forEach(function(p){ newStates[p.name] = p.state; });
+  Object.keys(newStates).forEach(function(name){
+    var prev = prevStates[name], cur = newStates[name];
+    if (prev && prev !== cur){
+      pulses[name] = { r:0, max:45, color: COLORS[cur] || '#fff' };
+      if (cur === 'infected' && !incidentPod){
+        incidentPod   = name;
+        incidentStart = Date.now();
+        updateTimeline('running');
+      }
+      if (prev === 'forensic' && cur !== 'forensic'){
+        incidentPod = null;
+        incidentStart = null;
+        updateTimeline('idle');
+      }
+    }
+  });
+  prevStates = newStates;
+  pods = data.pods || [];
+  edges = data.edges || [];
+  updateStats();
+  updatePodList();
+}
+
+function handleEvent(msg){
+  addLog(msg.level, msg.message);
+}
+
+function updateStats(){
+  var c = {healthy:0,hardened:0,infected:0,draining:0,isolated:0,forensic:0,respawning:0};
+  pods.forEach(function(p){ c[p.state] = (c[p.state]||0)+1; });
+  document.getElementById('s0').textContent = c.healthy;
+  document.getElementById('s1').textContent = c.hardened;
+  document.getElementById('s2').textContent = c.infected;
+  document.getElementById('s3').textContent = c.draining;
+  document.getElementById('s4').textContent = c.isolated;
+  document.getElementById('s5').textContent = c.forensic;
+  document.getElementById('s6').textContent = c.respawning;
+}
+
+function updatePodList(){
+  var el = document.getElementById('pod-list');
+  el.innerHTML = pods.map(function(p){
+    var col  = COLORS[p.state]  || '#888';
+    var bg   = BADGE_BG[p.state]|| '#111';
+    var cred = p.has_credential
+      ? '<div class="pod-cred" title="JIT credential active"></div>'
+      : '<div class="pod-cred none" title="No credential"></div>';
+    return '<div class="pod-row" onclick="infectPod(\''+p.name+'\')" title="Click to inject malware">'
+      + '<span class="pod-name">'+p.name+'</span>'
+      + '<span class="pod-right">'
+      + cred
+      + '<span class="pod-state-badge" style="color:'+col+';background:'+bg+'">'+p.state+'</span>'
+      + '</span></div>';
+  }).join('');
+}
+
+var TL_STEPS = [
+  { t:'T+0s',   label:'Vault JIT token revoked — attacker credential dead' },
+  { t:'T+0s',   label:'7 neighbours hardened (alignment rule)' },
+  { t:'T+0s',   label:'Pod removed from load balancer (no traffic loss)' },
+  { t:'T+0s',   label:'Replacement pod created — running security-patch init' },
+  { t:'T+30s',  label:'Init: OS patches applied, compliance scan passed' },
+  { t:'T+35s',  label:'Fresh JIT credential issued to replacement' },
+  { t:'T+35s',  label:'Traffic switched to replacement — ZERO DOWNTIME' },
+  { t:'T+36s',  label:'Infected pod sealed: NetworkPolicy deny all' },
+  { t:'T+36s',  label:'Forensic window open (60s analysis)' },
+  { t:'T+96s',  label:'Infected pod deleted — StatefulSet respawns clean' },
+];
+
+function updateTimeline(mode){
+  var el = document.getElementById('timeline');
+  if (mode === 'idle'){
+    el.innerHTML = '<div class="tl-row"><span class="tl-t"></span><span class="tl-pending">Waiting for infection event...</span></div>';
+    return;
+  }
+  el.innerHTML = TL_STEPS.map(function(s, i){
+    var elapsed = incidentStart ? Math.floor((Date.now()-incidentStart)/1000) : 0;
+    var tSec = parseInt(s.t.replace('T+','').replace('s',''));
+    var active = elapsed >= tSec;
+    return '<div class="tl-row"><span class="tl-t">'+s.t+'</span>'
+      + '<span class="'+(active ? 'tl-active' : 'tl-pending')+'">'
+      + (active ? '\u2713 ' : '\u00b7 ') + s.label + '</span></div>';
+  }).join('');
+}
+
+setInterval(function(){
+  if (incidentPod) updateTimeline('running');
+}, 1000);
+
+function addLog(level, message){
+  var ts  = new Date().toTimeString().slice(0,8);
+  var cls = {danger:'log-danger',warn:'log-warn',ok:'log-ok',info:'log-info'}[level]||'log-gray';
+  logLines.unshift('<div class="log-line '+cls+'">'+ts+' '+message+'</div>');
+  if (logLines.length > 80) logLines.pop();
+  document.getElementById('log').innerHTML = logLines.slice(0,40).join('');
+}
+
+function infectPod(name){
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'infect', pod:name}));
+}
+function injectRandom(){
+  var healthy = pods.filter(function(p){ return p.state === 'healthy'; });
+  if (!healthy.length) return;
+  infectPod(healthy[Math.floor(Math.random()*healthy.length)].name);
+}
+function healAll(){
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'heal_all'}));
+}
+
+function scalePos(pod){
+  return { x: pod.x / 760 * W, y: pod.y / 400 * H };
+}
+
+function drawFrame(){
+  requestAnimationFrame(drawFrame);
+  tick++;
+  ctx.fillStyle = '#080c18';
+  ctx.fillRect(0, 0, W, H);
+
+  var podMap = {};
+  pods.forEach(function(p){ podMap[p.name] = p; });
+
+  // Edges
+  edges.forEach(function(e){
+    var a = podMap[e.from], b = podMap[e.to];
+    if (!a || !b) return;
+    var pa = scalePos(a), pb = scalePos(b);
+    var skip = ['isolated','forensic'].includes(a.state) || ['isolated','forensic'].includes(b.state);
+    if (skip) return;
+    var hot = ['infected','draining'].includes(a.state)||['infected','draining'].includes(b.state);
+    var hard = a.state==='hardened'||b.state==='hardened';
+    ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y);
+    ctx.lineTo(pb.x, pb.y);
+    ctx.strokeStyle = hot ? 'rgba(226,75,74,0.3)' : hard ? 'rgba(239,159,39,0.18)' : 'rgba(70,90,130,0.18)';
+    ctx.lineWidth = hot ? 1.2 : 0.7;
+    ctx.stroke();
+  });
+
+  // Pulses
+  pods.forEach(function(p){
+    var pos = scalePos(p);
+    var pulse = pulses[p.name];
+    if (pulse){
+      pulse.r += 1.6;
+      var alpha = Math.max(0, 1-pulse.r/pulse.max)*0.35;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 14+pulse.r, 0, Math.PI*2);
+      ctx.strokeStyle = pulse.color+'88';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      if (pulse.r >= pulse.max) delete pulses[p.name];
+    }
+  });
+
+  // Pods
+  pods.forEach(function(p){
+    var pos = scalePos(p);
+    var col = COLORS[p.state] || '#888';
+    var r   = 12;
+
+    // Forensic: dashed double ring
+    if (p.state === 'forensic' || p.state === 'isolated'){
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r+7, 0, Math.PI*2);
+      ctx.setLineDash([3,3]);
+      ctx.strokeStyle = p.state==='forensic' ? 'rgba(155,127,168,0.45)' : 'rgba(123,94,167,0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draining: animated dashed ring (traffic being removed)
+    if (p.state === 'draining'){
+      var dashOffset = (tick * 0.5) % 20;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r+5, 0, Math.PI*2);
+      ctx.setLineDash([4,4]);
+      ctx.lineDashOffset = -dashOffset;
+      ctx.strokeStyle = 'rgba(255,107,53,0.6)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+    }
+
+    // Respawning: arc progress
+    if (p.state === 'respawning'){
+      var prog = (Math.sin(tick*0.04)+1)/2;
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, r+4, -Math.PI/2, -Math.PI/2+prog*Math.PI*2);
+      ctx.strokeStyle = '#378ADD';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+
+    // Main pod circle
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
+    ctx.globalAlpha = ['isolated','forensic'].includes(p.state) ? 0.45 : 1.0;
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Rim
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // JIT credential dot (top-right of pod)
+    if (p.has_credential){
+      ctx.beginPath();
+      ctx.arc(pos.x+9, pos.y-9, 3, 0, Math.PI*2);
+      ctx.fillStyle = '#1D9E75';
+      ctx.fill();
+    }
+
+    // Pod label
+    ctx.font = '8px monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name.replace(/.*-/, ''), pos.x, pos.y+3);
+    ctx.textAlign = 'left';
+  });
+
+  // HUD
+  ctx.font = '10px monospace';
+  ctx.fillStyle = 'rgba(100,160,255,0.25)';
+  ctx.fillText('MURMURATION v2  |  zero-downtime  |  JIT creds  |  patch-on-respawn', 10, 16);
+
+  if (!pods.length){
+    ctx.font = '13px system-ui';
+    ctx.fillStyle = 'rgba(150,170,200,0.35)';
+    ctx.textAlign = 'center';
+    ctx.fillText('Waiting for pods...', W/2, H/2);
+    ctx.textAlign = 'left';
+  }
+}
+
+canvas.addEventListener('click', function(e){
+  var rect = canvas.getBoundingClientRect();
+  var sx = W/rect.width, sy = H/rect.height;
+  var mx = (e.clientX-rect.left)*sx, my = (e.clientY-rect.top)*sy;
+  var best = null, bestD = 9999;
+  pods.forEach(function(p){
+    var pos = scalePos(p);
+    var d = Math.sqrt((mx-pos.x)**2+(my-pos.y)**2);
+    if (d<bestD){ bestD=d; best=p; }
+  });
+  if (best && bestD < 20 && best.state === 'healthy') infectPod(best.name);
+});
+
+connect();
+drawFrame();
+</script>
+</body>
+</html>

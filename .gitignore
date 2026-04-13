@@ -1,0 +1,218 @@
+# ── Secrets & credentials (never commit these) ──────────────────────────────────
+.env
+.env.*
+*.env
+!.env.example
+!.env.sample
+!.env.template
+secrets/
+secret.yaml
+secrets.yaml
+*-secret.yaml
+*-secrets.yaml
+override-values.yaml
+values.local.yaml
+values.override.yaml
+values.*.local.yaml
+*.pem
+*.key
+*.p8
+*.p12
+*.pfx
+*.crt
+*.cer
+*.csr
+*.jks
+*.keystore
+*.truststore
+kubeconfig
+kubeconfig.*
+.kube/
+.vault-token
+vault-token
+.netrc
+.npmrc
+.pypirc
+*.htpasswd
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_ecdsa
+id_ecdsa.*
+*.ppk
+google-credentials.json
+service-account*.json
+gcloud-credentials.json
+aws-credentials
+credentials.json
+auth.json
+
+# ── Python ───────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+.installed.cfg
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# ── Helm ─────────────────────────────────────────────────────────────────────────
+# Packaged charts
+*.tgz
+charts/*.tgz
+# Rendered manifest output
+rendered/
+output/
+# Helm test results
+helm-test-results/
+
+# ── Kubernetes ───────────────────────────────────────────────────────────────────
+# kind cluster configs (may embed certs/keys after cluster creation)
+kind-kubeconfig*
+kind-config-rendered.yaml
+# Applied manifest snapshots
+applied/
+manifests/rendered/
+
+# ── Docker ───────────────────────────────────────────────────────────────────────
+# Local build context caches
+.dockerignore
+docker-compose.override.yml
+
+# ── Logs & runtime ───────────────────────────────────────────────────────────────
+*.log
+*.logs
+logs/
+log/
+tmp/
+temp/
+.tmp/
+*.pid
+*.seed
+*.pid.lock
+crash.log
+crash.*.log
+
+# ── Large media (use git-lfs or external storage instead) ────────────────────────
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+imgs/*.mp4
+imgs/*.mov
+# Demo video committed intentionally — embedded in README
+!murmuration-k8s-v2/imgs/murmurization.mp4
+
+# ── OS artefacts ─────────────────────────────────────────────────────────────────
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ── IDEs & editors ───────────────────────────────────────────────────────────────
+# VS Code
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+# JetBrains
+.idea/
+*.iml
+*.iws
+out/
+.factorypath
+# Vim / Neovim
+*.swp
+*.swo
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+# Sublime Text
+*.sublime-workspace
+*.sublime-project
+
+# ── Node (if UI tooling is added) ────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm
+.yarn
+.pnp.*
+.eslintcache
+.stylelintcache
+
+# ── Misc ─────────────────────────────────────────────────────────────────────────
+*.bak
+*.orig
+*.patch
+*.rej
+.git-credentials
+.envrc
+.direnv/
