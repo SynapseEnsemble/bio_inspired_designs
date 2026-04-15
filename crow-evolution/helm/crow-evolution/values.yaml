@@ -1,0 +1,23 @@
+orchestrator:
+  image: crow-orchestrator:dev
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+  env:
+    N_AGENTS: "10"
+    N_ROUNDS: "10"
+    MAX_TOKENS: "800"
+    CROW_MODEL: "claude-sonnet-4-20250514"
+    TASK_TOPIC: "climate change adaptation strategies for coastal cities"
+
+ui:
+  image: crow-ui:dev
+  imagePullPolicy: IfNotPresent
+  replicas: 1
+
+# Anthropic API key — set this at install time:
+# helm install crow-evolution ./helm/crow-evolution --set anthropic.apiKey=sk-ant-...
+anthropic:
+  apiKey: ""
+  existingSecret: ""      # alternative: name of existing Secret with key ANTHROPIC_API_KEY
+
+namespace: crow-evolution

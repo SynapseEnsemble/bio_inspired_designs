@@ -1,0 +1,65 @@
+version: "3.9"
+
+# Dev compose — spins up the orchestrator, UI nginx, and a Redis sidecar.
+# Redis data is NOT persisted across restarts in this config (no volume mount).
+# For persistence add: volumes: [redis_data:/data] and command: redis-server --appendonly yes
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      REDIS_URL: redis://redis:6379/0
+      # Agent backend: "anthropic" (default) or "ollama" (local)
+      AGENT_BACKEND: ${AGENT_BACKEND:-anthropic}
+      AGENT_OLLAMA_URL: ${AGENT_OLLAMA_URL:-http://host.docker.internal:11434}
+      SIM_MODEL: ${SIM_MODEL:-claude-sonnet-4-20250514}
+      # Judge backend: "anthropic" (default) or "ollama" (local)
+      JUDGE_BACKEND: ${JUDGE_BACKEND:-anthropic}
+      JUDGE_MODEL: ${JUDGE_MODEL:-claude-haiku-4-5-20251001}
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      N_AGENTS: ${N_AGENTS:-10}
+      N_ROUNDS: ${N_ROUNDS:-10}
+      MAX_TOKENS: ${MAX_TOKENS:-1000}
+      EMA_ALPHA: ${EMA_ALPHA:-0.30}
+      PAIRWISE_WEIGHT: ${PAIRWISE_WEIGHT:-0.35}
+      PRUNE_PERCENTILE: ${PRUNE_PERCENTILE:-0.25}
+      AGENT_STAGGER: ${AGENT_STAGGER:-2.0}
+      INFERENCE_JITTER: ${INFERENCE_JITTER:-0.0}
+      TASK_TOPIC: ${TASK_TOPIC:-climate change adaptation strategies for coastal cities}
+      PORT: "8080"
+    extra_hosts:
+      # Allows Docker container to reach Ollama on the host machine (Linux)
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8081:8080"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - orchestrator
+    restart: unless-stopped
+
+volumes: {}

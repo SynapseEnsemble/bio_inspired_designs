@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crow-orchestrator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: crow-orchestrator
+spec:
+  replicas: {{ .Values.orchestrator.replicas }}
+  selector:
+    matchLabels:
+      app: crow-orchestrator
+  template:
+    metadata:
+      labels:
+        app: crow-orchestrator
+    spec:
+      containers:
+        - name: orchestrator
+          image: {{ .Values.orchestrator.image }}
+          imagePullPolicy: {{ .Values.orchestrator.imagePullPolicy }}
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.anthropic.existingSecret | default "crow-anthropic-key" }}
+                  key: ANTHROPIC_API_KEY
+            {{- range $k, $v := .Values.orchestrator.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crow-orchestrator
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: crow-orchestrator
+  ports:
+    - port: 8080
+      targetPort: 8080

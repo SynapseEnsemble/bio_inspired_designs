@@ -1,0 +1,6 @@
+apiVersion: v2
+name: crow-evolution
+description: AI Agent Cultural Learning System — 10 Claude agents compete, copy and converge
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

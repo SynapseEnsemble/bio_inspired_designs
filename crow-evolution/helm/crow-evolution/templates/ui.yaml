@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crow-ui
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: crow-ui
+spec:
+  replicas: {{ .Values.ui.replicas }}
+  selector:
+    matchLabels:
+      app: crow-ui
+  template:
+    metadata:
+      labels:
+        app: crow-ui
+    spec:
+      containers:
+        - name: ui
+          image: {{ .Values.ui.image }}
+          imagePullPolicy: {{ .Values.ui.imagePullPolicy }}
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: crow-ui
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: crow-ui
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
