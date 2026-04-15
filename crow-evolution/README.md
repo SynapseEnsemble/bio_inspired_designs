@@ -1,12 +1,14 @@
-# NEXUS — Population Dynamics Simulator
+![alt text](image.png)
+
+# Crow Learning Simulator Applied to Multi Agent Systems and Cyber Security
 
 ## The Science of Crows
 
 ### Why Crows?
 
-New Caledonian crows (*Corvus moneduloides*) are, outside of humans, the most sophisticated tool manufacturers on Earth. They fabricate hooks from twigs, cut stepped tools from pandanus leaves, and — crucially — pass these techniques across generations with enough fidelity that geographically distinct populations have developed distinct regional tool traditions that persist for decades. This is the hallmark of cumulative technological culture: each generation inherits the best techniques of the last and, occasionally, improves on them.
+Crows, yes Crows (Birds) are, outside of humans, the most sophisticated tool manufacturers on Earth. They fabricate hooks from twigs, cut stepped tools from pandanus leaves and  crucially — pass these techniques across generations with enough fidelity that geographically distinct populations have developed distinct regional tool traditions that persist for decades. This is the hallmark of cumulative technological culture: each generation inherits the best techniques of the last and, occasionally, improves on them.
 
-What makes crows scientifically extraordinary is not just the tools themselves but the *transmission mechanism*. Crows do not appear to imitate motor actions directly. Research suggests they form **mental templates** — internal representations of a successful tool design — and then reproduce those templates in new material. This is analogous to how a musician learns a melody: not by copying finger movements but by internalising the sound and then reconstructing it. The crow encodes *what success looks like*, not *how success was achieved*.
+What makes crows scientifically extraordinary is not just the tools themselves but the *transmission mechanism*. Crows do not appear to imitate motor actions directly. Research suggests they form **mental templates** — internal representations of a successful tool design and then reproduce those templates in new material. This is analogous to how a musician learns a melody: not by copying finger movements but by internalising the sound and then reconstructing it. The crow encodes *what success looks like*, not *how success was achieved*.
 
 Three properties define their cumulative cultural evolution:
 
@@ -18,7 +20,7 @@ The mechanism that enables this is called the **ratchet effect**: each successfu
 
 Social learning in crows is also selective. Juveniles take over a year to reach adult proficiency, spending that time observing parents, interacting with their tools as artefacts, and practicing. The learning is not passive broadcast — it is active, scaffolded, and mediated by proximity to successful practitioners.
 
-### The Shared Artefact as Knowledge Carrier
+### The Shared Artifact as Knowledge Carrier
 
 Most relevant to this simulation: crows' tool designs are transmitted not only through observation of other crows but through interaction with the physical tools themselves. A juvenile who finds and handles an adult's pandanus tool learns something about the design even without watching it being made. The artefact carries information forward in time independently of any individual crow.
 
@@ -30,7 +32,7 @@ This is the biological model for this simulation's **shared state** — a persis
 
 ### Core Theory
 
-NEXUS implements a computational analogue of New Caledonian crow cultural evolution applied to AI reasoning agents. The central question it attempts to answer is:
+My prototype implements a computational analogue of New Caledonian crow cultural evolution applied to AI reasoning agents. The central question it attempts to answer is:
 
 > **When multiple AI agents attempt the same task using different reasoning strategies, and can observe which strategies are performing well, does a selection-and-transmission dynamic emerge that improves population-level performance over successive rounds?**
 
@@ -42,6 +44,7 @@ After scoring, a fitness update propagates: each technique's fitness score is up
 
 This is the ratchet: successful techniques spread, unsuccessful ones lose agents, and the population's shared fitness record carries forward what worked.
 
+
 ### Techniques
 
 | Name | Label | What it actually does |
@@ -52,6 +55,18 @@ This is the ratchet: successful techniques spread, unsuccessful ones lose agents
 | Direct strike | Direct inference | Immediate answer, no scaffolding |
 | Verify-then-act | Self-verify loop | DRAFT / CRITIQUE / FINAL revision cycle |
 | Code-exec grip | Code + execution | Writes Python, runs it, uses stdout in answer |
+
+Hook tool — crows literally bend twigs into hooks to extract grubs from holes. The chain-of-thought technique hooks into a problem step by step, pulling reasoning out sequentially.
+
+Drop & retrieve — crows drop objects into water or holes to retrieve food that was out of reach. The web search technique drops a query into the internet and retrieves something it couldn't have reached from memory alone.
+
+Step-back probe — crows use probing tools by stepping back from the hole first to assess depth and angle before inserting. The step-back technique zooms out to first principles before engaging with the problem directly.
+
+Direct strike — crows sometimes just strike at prey or food directly with their beak, no tool needed. The direct inference technique does the same — no scaffolding, just answer.
+
+Verify-then-act — crows test a tool's fit before committing to using it, adjusting grip and angle. The self-verify loop drafts, tests its own output critically, then revises before committing.
+
+Code-exec grip — crows grip tools at precise angles calibrated to the task. The code technique grips the problem computationally — writes structured code, executes it, uses the result as the answer rather than estimating.
 
 ---
 
@@ -258,7 +273,7 @@ Agents given more tokens per response (800–1000) produced responses that diffe
 
 At 200–300 tokens, all techniques tended toward similar outputs — short, direct answers that the judge scored similarly regardless of technique. The fitness landscape flattened. Convergence happened, but toward whichever technique happened to score highest on the first round rather than through genuine selection pressure.
 
-This suggests a **minimum viable token budget** for technique differentiation to be meaningful. The threshold appears to be around 400–600 tokens for the tasks tested — enough for a technique's structural properties to be expressed but not so much that verbosity alone dominates the score.
+This suggests a **minimum viable token budget** for technique differentiation to be meaningful. The threshold appears to be around 600-1000 tokens for the tasks tested — enough for a technique's structural properties to be expressed but not so much that verbosity alone dominates the score.
 
 The implication for scaling: increasing tokens per agent does not just improve response quality, it improves the *discriminability* of the fitness signal. A simulation with 10 agents at 800 tokens will converge more reliably than one with 20 agents at 200 tokens, because the fitness differences between techniques are large enough for the judge to detect.
 
@@ -274,6 +289,7 @@ In the simulation, this means **technique fitness scores are partially confounde
 
 ---
 
+## Getting Started
 
 ### Prerequisites
 
